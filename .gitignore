@@ -1,0 +1,13 @@
+*.csv
+*.tsv
+*.txt
+*.tmp
+*.py.log
+*.logger
+__pycache__/*
+*/notebooks/.ipynb_checkpoints/*
+# exclude everything
+*/data/*
+*/datasets/*
+*/figures/*
+**/__pycache__
