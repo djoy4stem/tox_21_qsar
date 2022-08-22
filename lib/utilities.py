@@ -9,6 +9,13 @@ from rdkit.Chem import PandasTools, AllChem, MolFromSmiles, Draw, MolToInchiKey,
 from rdkit.SimDivFilters.rdSimDivPickers import MaxMinPicker
 
 
+def randomize_smiles(smiles, isomericSmiles=False):
+    "Take a SMILES string, and return a valid, randomized, abd equivalent SMILES string"
+    from rdkit import Chem
+    mol = Chem.MolFromSmiles(smiles)
+    random = Chem.MolToSmiles(mol, canonical=False, doRandom=True, isomericSmiles=isomericSmiles)
+    return random
+
 def min_max_train_test_split_df(dataframe, molecule_column, inchikey_column, test_ratio=0.2, fp_type= "morgan", random_state=1, return_indices=False):
     """
     """
@@ -102,6 +109,26 @@ def avg_and_drop_duplicates(dataframe, target, inchikey_column):
         groups.append(unique_row)
 #     print(groups)
     return pd.concat(groups, axis=0)
+
+def remove_conflicting_target_values(dataframe, target, inchikey_column):
+    groups = []
+    
+    for name, group in dataframe.groupby(inchikey_column):
+        n_conflicts = 0
+        unique_target_values =  group[target].unique().tolist()
+        if len(unique_target_values) > 1:
+            n_conflicts += 1
+            print("InchIKey {} has {} conflicting {} values. All associated samples will be removed.".format(name, len(unique_target_values), target))
+        else:
+    #         print("{} - {} - {}".format(group.shape, group[target].values, mean_target_value))
+            unique_row         = group.drop_duplicates(subset=[inchikey_column], keep='first')
+            groups.append(unique_row)
+    #     print(groups)
+    if n_conflicts > 0:
+        print("Number of unique compounds with conflicts: {}".format(n_conflicts))
+    return pd.concat(groups, axis=0)    
+
+
 
 def min_max_train_validate_test_split_df(dataframe, molecule_column, inchikey_column=None, fp_column=None, train_valid_ratios=[0.7, 0.15]
                                 , fp_type= "morgan", random_state=1, return_indices=False):
