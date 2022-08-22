@@ -1,14 +1,5 @@
+**/figures/**
+**/.ipynb_checkpoints/**
 *.csv
-*.tsv
-*.txt
-*.tmp
-*.py.log
-*.logger
-__pycache__/*
-*/notebooks/.ipynb_checkpoints/*
-**/.ipynb_checkpoints/*
-# exclude everything
-*/data/*
-*/datasets/*
-*/figures/*
-**/__pycache__
+*.log
+**/__pycache__/
