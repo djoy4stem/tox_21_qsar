@@ -2,6 +2,8 @@ import os
 import sys
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
+from typing import List, Union, Any, Tuple
 
 from rdkit import Chem, DataStructs
 from rdkit.Chem.rdMolDescriptors import GetMorganFingerprint, GetAtomPairFingerprint, GetTopologicalTorsionFingerprint
@@ -16,11 +18,59 @@ def randomize_smiles(smiles, isomericSmiles=False):
     random = Chem.MolToSmiles(mol, canonical=False, doRandom=True, isomericSmiles=isomericSmiles)
     return random
 
-def min_max_train_test_split_df(dataframe, molecule_column, inchikey_column, test_ratio=0.2, fp_type= "morgan", random_state=1, return_indices=False):
+def add_numbers_to_mol_atoms(mol):
+    for atom in mol.GetAtoms():
+        # For each atom, set the property "atomNote" to a index+1 of the atom
+        atom.SetProp("atomNote", str(atom.GetIdx()+1))
+
+def molecule_from_smiles(smiles:str, add_explicit_h:bool=True):
+    ### Modified version of the code from
+    ### https://keras.io/examples/graph/mpnn-molecular-graphs/
+    molecule = Chem.MolFromSmiles(smiles, sanitize=False)
+
+    if molecule is None:
+        print(f"Could not generate molecule from SMILES: {smiles}.")
+    else:
+        # print(Chem.MolToSmiles(molecule))
+        # If sanitization is unsuccessful, catch the error, and try again without
+        # the sanitization step that caused the error
+        flag = Chem.SanitizeMol(molecule, catchErrors=True)
+        if flag != Chem.SanitizeFlags.SANITIZE_NONE:
+            Chem.SanitizeMol(molecule, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ flag)
+        if add_explicit_h: 
+            molecule = Chem.AddHs(molecule)
+            # print(Chem.MolToSmiles(molecule))
+        Chem.AssignStereochemistry(molecule, cleanIt=True, force=True)
+    return molecule
+
+
+
+def augment_data(compounds_df, smiles_column, target_column, n_randomizations=1):  
+    temp_dfs = []
+    for index, row in compounds_df.iterrows():
+        original_smiles = row[smiles_column]
+        smiles=[original_smiles]
+        for i in range(n_randomizations):          
+            smiles.append(randomize_smiles(original_smiles))
+#         print("SMILES = {}".format(smiles))
+        df = pd.DataFrame(list(set(smiles)), columns=[smiles_column])
+        df[target_column] = row[target_column]
+#         print(df)
+        temp_dfs.append(df)
+    final_df = pd.concat(temp_dfs, axis=0)
+    final_df = final_df.reset_index(drop=True)
+    return final_df
+
+
+
+
+def min_max_train_test_split_df(dataframe, molecule_column, inchikey_column, test_ratio=0.2
+                                , fp_type= "morgan", random_state=1, return_indices=False):
     """
     """
     
-    # Store the InChIKeys. These will be used to split the dataframe to ensure no molecule is both in the train and test sets.
+    # Store the InChIKeys. These will be used to split the dataframe to ensure
+    # no molecule is both in the train and test sets.
     if inchikey_column is None:
         print("Computing and storing the InChiKeys...")
         inchikey_column = "InChIKey"
@@ -176,7 +226,7 @@ def min_max_train_validate_test_split(list_of_rdkit_representations, train_valid
     fp_types = { "morgan": "GetMorganFingerprint", "atom_pair": "GetAtomPairFingerprint", "top_torso": "GetTopologicalTorsionFingerprint"} 
     """
     try:
-        input_mode =list_of_rdkit_representations[0].__class__.__name__
+        input_mode = list_of_rdkit_representations[0].__class__.__name__
          
         picker = MaxMinPicker()
         fps    = None
@@ -240,3 +290,25 @@ def min_max_train_validate_test_split(list_of_rdkit_representations, train_valid
         print("Could not perform clustering and selection.")
         print(e)
         return None
+    
+
+
+
+####################################### 
+#             VISUALIZATION           #
+#######################################
+def plots_train_val_metrics(train_losses:List[float], val_accuracies:List[float]
+                            , val_losses:List[float]=None, figsize:Tuple=(10, 7)
+                            , image_pathname:str=None):
+    
+    plt.figure(figsize=figsize)
+    plt.plot(train_losses, color='orange', label='train loss')
+    if not val_losses is None:
+        plt.plot(val_losses, color='red', label='val. loss')
+    plt.plot(val_accuracies, color='green', label='val. accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss/Accuracy')
+    plt.legend()
+    if not image_pathname is None:
+        plt.savefig(image_pathname)
+    plt.show()

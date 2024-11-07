@@ -2,4 +2,5 @@
 **/.ipynb_checkpoints/**
 *.csv
 *.log
+*.old
 **/__pycache__/
